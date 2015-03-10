@@ -1,4 +1,4 @@
 # khet
 Python implementation of the laser-chess game Khet.
 
-Requires wxPython 2.8.
+Last tested with wxPython 2.8 and Python 2.7.
