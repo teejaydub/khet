@@ -1,0 +1,132 @@
+To do:
+
+Bugs
+	Capture mouse events, so we can get a mouse-up outside the window to cancel the move.
+Cleanup
+	Maybe the translation of moves from engine-game to ui-game should go on in the UI layer instead of the engine layer.
+		Then TakeNextMove's semantics would be clearer - add this move to the game and adjust.
+		
+Engines
+ 	Sekhemkhet: Strategies
+		A Strategy is a programmer-defined object that has conditions under which it can be applied.
+		The engine has a list of Strategies in priority order.
+		Strategies embody defensive or offensive principles in a more sophisticated way than can be done with a single heuristic.
+			That is - not just "it's bad when the opponent's Djed gets near your Pharoah," 
+				but what to do about it if it happens - move your Djed down, e.g.
+			Or: get a pyramid on your 7th laser row, and another one in front of your opponent's Pharoah.
+		Strategies can then generate a Plan based on the current board.
+			The Plan is a specific implementation based on the current board.
+			E.g., move specific pyramid P from its current position to (1, 4), and rotate it to face NE, and move Q from its current pos to (1, 10).
+		Strategies can recognize when the current Plan gets upset.
+			E.g., pyramid P just got hit and no longer exists.
+			The Plan is then regenerated the next time the Strategy is applied.
+		On each move, the list of Strategies is re-examined.
+			This may result in triggering of a defensive Strategy because the opponent has started a recognized attack pattern.
+			So, the corresponding defensive Stategy's Plan is created (if it doesn't already exist; updated if necessary), and then its moves
+				get priority over the offensive plan we were following.
+			When the defensive Plan has been satisfied, its Strategy recognizes that the threat has been nullified (perhaps temporarily), and
+				so it gets lower priority, probably resulting in an offensive Strategy getting followed again.
+		Then the active Plan results in a value that's added to the objective function - but ONLY at the top level.
+			I think this is what differentiates a Strategy from a complicated heuristic.
+			In fact, it's the thing that allows us to use Strategies, since they're inherently more complicated and you can't afford
+				to evaluate them for every move in the tree.
+		Make framework
+			sekhemkhetEngine
+			Strategy class
+			list of strategies and their priorities
+			framework to apply the active strategies to the move list.
+		Strategies to implement
+			If an opposing Djed gets close to your Pharaoh, move your own Djed closer.
+			Leave your Pharaoh on its home row, especially if it's got protection (own pieces on both sides).
+				Is this really a Strategy?
+			Find an attack path
+				Search in increasing order of number of pieces involved.
+				A one-piece path is an open rank from the opponent's Pharaoh to your laser file.
+				A two-piece path is an open file from the opponent's Pharaoh to a piece that has an open rank to your laser file.
+				Count pieces as part of the path if they are yours, or if they are already rotated to the correct rotation.
+					The opponent's pieces are less useful, of course.
+			Keep at least one active laser pyramid.
+			If your best move has a negative score, privilege a move that leads to a tie.
+				Encode each board as a string of piece/square positions (like the initial position notation in PGN).
+				When each move is committed, use its string representation as a hash to a dictionary of repetition counts.
+				It's a potential (claimable) tie if a move would lead to a board that already has count = 2.
+				Could even work toward it.
+					By adding the resulting board's repetition count to the objective value, multiplied by some factor.
+	Position dictionaries
+		Code each board position (+ who's next to move) as a string.
+			Need not be ASCII, so maybe nibblewise or BCD coords, piece type + rotation
+		Use board position codes as keys in a hash = position dictionary.
+			Value is the move score, number of plies completely inspected, and best moves
+				I.e., what we're currently storing in a Move.
+		Then, when a Move is generated, store it as a pointer to the resulting board position.
+			Look that position up in the dictionary, and either reference the existing one or make a new one.
+		This way, existing positions will be reused instead of re-inspected.
+			I think this can produce an exponential speed increase on the third ply and further.
+		How to manage the position dictionary?
+			Discarding positions when memory's tight
+				LRU?
+			Saving the whole dictionary to disk and reloading for a new game
+				Could really jump-start the opening... but could also take a LOT of disk and memory.
+	Optimization
+		Profile again.
+		Use wxArray for board?
+		Code the analysis in C++ for speed?
+			Would require khetGame, khetEngine, and all the engines...
+		optimize MinExploredDepth and MaxExploredDepth?
+			
+Treats
+	Allow the human to claim a tie.
+	Undo/redo
+	Rework unstacking so it can be done by grabbing a particular part of the obelisk - no modal dialog, anyway.
+		Remove FinishConfirmMove and move Obelisk's code there into FinishMakeMove.
+	Allow for multiple engines to play one another.
+		Right now, there's a tacit assumption that the main window will only have one engine.
+	Show only one rotation handle for Djeds?
+	Rotate board command (180 degrees)
+	Keyboard movement
+		Select a highlighted piece with arrow keys, tab, or by typing digits of rows and columns.
+			Display square coordinates smaller
+			Have an option for whether the board shows coordinates
+		Shortcut keys for rotation: <, >
+		Any key clears the laser.
+	More engine commands
+		Evaluate
+			Just give a score for the current position.
+		A full evaluation window, a la Fritz.
+	Support other starting layouts
+		Default to Classic on load if unstated, but save it in the Game and in the file.
+			Save by name for Classic, Imhotep, and Dynasty; otherwise say: Setup "Empty"
+				 and then supply the piece lists like:
+					[Position Silver "pa5, Pd8, ..."]
+
+Niggles
+	Lock out UI actions except New Game while analyzing, or perhaps a Cancel that stops analyzing.
+	Fix so taking over during laser confirm phase doesn't give the current player an extra move!
+	Fix so restoring a game that's at the end shows the Pharaoh being hit, not the piece that would get hit after the
+		Pharaoh is taken out of the way.
+		Requires determination of game-end based not on "no Pharaoh" but on "Pharaoh is hit".
+		Will look better, and also not mislead in case another piece is "consecutively" hit.
+	Fix so player names are kept when you load, then save again.
+
+Better graphics
+	Better scaling - no fixed pixel sizes.
+		And/or, bitmapped pieces.
+	Antialiased lines
+	Transparency
+	Smooth dragging
+	Animated computer moves
+Notation view
+
+Engine improvements
+	Get names from http://en.wikipedia.org/wiki/List_of_Pharaohs
+		Khufu, Neferefre
+	Save compressed board positions, depth examined, best move for each player, and oValues
+		One nibble per coordinate = 1 byte per piece (with 0xF reserved for "off the board") = 28 bytes for board setup
+	Tune heuristic and objective coefficients
+		Use a genetic algorithm: cross randomly-generated sets of coefficients, play them off for 100 games, and breed the winners.
+		Don't need to use many plys of lookahead, because the point is to evaluate their ability to predict without lookahead.
+	Opening book
+		Generate by running a very long analysis of the opening setup
+For fun play, add easy levels that make mistakes
+	Could just have it control the % chance that it will make a completely random move.
+	Or for better play, could make a move from further down in the sort order (plausible but not best).
