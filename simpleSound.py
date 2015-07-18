@@ -25,12 +25,15 @@ def Play(filename):
     if platform.system().startswith('Win'):
         PlaySound(filename, SND_FILENAME|SND_ASYNC)
     elif platform.system().startswith('Linux'):
-        s = waveOpen(filename,'rb')
-        (nc,sw,fr,nf,comptype, compname) = s.getparams( )
-        dsp = ossOpen('/dev/dsp','w')
+        try:
+            s = waveOpen(filename,'rb')
+            (nc,sw,fr,nf,comptype, compname) = s.getparams( )
+            dsp = ossOpen('/dev/dsp','w')
 
-        dsp.setparameters(AFMT_S16_NE, nc, fr)
-        data = s.readframes(nf)
-        s.close()
-        dsp.write(data)
-        dsp.close()
+            dsp.setparameters(AFMT_S16_NE, nc, fr)
+            data = s.readframes(nf)
+            s.close()
+            dsp.write(data)
+            dsp.close()
+        except:
+            pass
